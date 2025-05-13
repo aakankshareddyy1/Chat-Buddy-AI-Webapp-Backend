@@ -6,7 +6,7 @@ const cors = require("cors");
 const app = express();
 const User = require("./model/User");
 require("dotenv").config();
-console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY);
+const axios = require("axios"); // Import axios
 const CookieParser = require("cookie-parser");
 const jwtSecret = process.env.JWT_SECRET;
 const jwt = require("jsonwebtoken");
@@ -39,27 +39,24 @@ app.post("/completions", async (req, res) => {
     return res.status(500).json({ error: "Server configuration error: API key not found" });
   }
 
-  const startTime = Date.now();
-  const options = {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${api_key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: req.body.message }],
-      max_tokens: 100,
-    }),
-  };
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", options);
-    const data = await response.json();
-    const endTime = Date.now();
-    console.log(`OpenAI API response time: ${endTime - startTime}ms`);
-    res.send(data);
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: req.body.message }],
+        max_tokens: 100,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${api_key}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    res.send(response.data);
   } catch (err) {
-    console.error("OpenAI API Error:", err);
+    console.error("OpenAI API Error:", err.message);
     res.status(500).json({ error: "Failed to get completion" });
   }
 });
@@ -93,9 +90,9 @@ app.post("/register", async (req, res) => {
     jwt.sign({ userId: createdUser._id, username }, jwtSecret, {}, (err, token) => {
       if (err) {
         console.error("Failed to create JWT token:", err);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json("Internal server error");
       } else {
-        res.cookie("token", token).status(201).json({ id: createdUser._id, message: "Registration successful! Please log in." });
+        res.cookie("token", token).status(201).json({ id: createdUser._id });
       }
     });
   } catch (err) {
@@ -118,9 +115,9 @@ app.post("/login", async (req, res) => {
       jwt.sign({ userId: foundUser._id, username }, jwtSecret, {}, (err, token) => {
         if (err) {
           console.error("Failed to create JWT token:", err);
-          return res.status(500).json({ error: "Internal server error" });
+          return res.status(500).json("Internal server error");
         }
-        res.cookie("token", token).json({ id: foundUser._id, message: "Login successful!" });
+        res.cookie("token", token).json({ id: foundUser._id });
       });
     } else {
       res.status(401).json({ error: "Invalid password" });
@@ -132,7 +129,7 @@ app.post("/login", async (req, res) => {
 
 // Logout
 app.post("/logout", (req, res) => {
-  res.cookie("token", "", { sameSite: "none", secure: true }).json({ message: "Logout successful" });
+  res.cookie("token", "", { sameSite: "none", secure: true }).json("deleted");
 });
 
 // Profile
